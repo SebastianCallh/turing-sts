@@ -6,67 +6,60 @@ Random.seed!(1234)
 Turing.setadbackend(:reversediff)
 Turing.setrdcache(true)
 
-function true_fn(t, α, β, αϵ, βϵ, σ)
-    map(t) do _
-        y = α + σ*randn()
-        α += β + αϵ*randn()
-        β += βϵ*randn()
-        Float32(y)
+function true_fn(t, x₀, x_scale, σ)
+    trans = [1 1 ; 0 1]
+    obs = [1 0]
+    x = x₀
+    mapreduce(vcat, t) do _
+        x = trans * x + x_scale*randn()
+        y = obs * x .+ σ*randn()
     end
 end
 
-N = 50
+T = 50
 σ = 0.1
-t = collect(1:N)
-α₀ = 1.3
-β₀ = -0.05
-αϵ = 0.1
-βϵ = 0.05
-y = true_fn(t, α₀, β₀, αϵ, βϵ, σ)
-scatter(t, y)
+tt = collect(1:T)
+x₀ = [1.3, -0.05]
+x_scale = [0.1, 0.05]
+y = true_fn(tt, x₀, x_scale, σ)
+scatter(tt, y)
 
-@model function local_linear(T, type, forecast=0)
-    αϵ ~ Gamma(2, 1e-2)
-    βϵ ~ Gamma(2, 1e-2)
-    α_z ~ MvNormal(zeros(T-1), I)
-    β_z ~ MvNormal(zeros(T-1), I)
-    α₀ ~ Normal(0, 1)
-    β₀ ~ Normal(0, 0.1)
-    σ ~ Exponential(0.1)
+@model function local_linear(T; obs_noise_scale=1., level_scale=1., slope_scale=1., forecast=0)
+    trans = [1 1; 0 1]
+    obs = [1 0]
+    D = size(trans, 1)
 
+    x₀ ~ MvNormal(zeros(D), I)
+    x_noise ~ filldist(Normal(0, 1), D, T)
+    ϵ ~ MvNormal(zeros(D), diagm([level_scale, slope_scale]))
+    σ ~ truncated(Normal(0, obs_noise_scale); lower=0)
+
+    x = x₀
     T′ = T + forecast
-    α = Vector{type}(undef, T′)
-    β = Vector{type}(undef, T′)
-    α[1] = α₀
-    β[1] = β₀
-    for t in 2:T′
-        t_clamped = min(T-1, t-1)
-        α[t] = α[t-1] + β[t-1] + αϵ*α_z[t_clamped]
-        β[t] = β[t-1] + βϵ*β_z[t_clamped]
+    μ = map(1:T′) do t
+        x = trans * x .+ ϵ .* x_noise[:,min(T, t)]
+        only(obs * x)
     end
 
-    μ = α
     Σ = I*σ^2
     y ~ MvNormal(μ, Σ)
 end
 
-model = local_linear(N, eltype(y))
+model = local_linear(T; level_scale=0.1, slope_scale=0.1)
 prior_samples = mapreduce(i -> rand(model).y, hcat, 1:50)
-prior_plt = plot(t, prior_samples, label=nothing, color=1, title="Prior predictive check")
-scatter!(prior_plt, t, y, color=2, label="Data")
+prior_plt = plot(tt, prior_samples, label=nothing, color=1, title="Prior predictive check")
+scatter!(prior_plt, tt, y, color=2, label="Data")
 
-chain = sample(model | (;y), NUTS(), 2000)
+chain = sample(model | (;y), NUTS(), 1000)
 posterior_samples = predict(model, chain)
 @assert isapprox(mean(chain, :σ), σ; atol=0.05)
-@assert isapprox(mean(chain, :αϵ), αϵ; atol=0.5)
-@assert isapprox(mean(chain, :βϵ), βϵ; atol=0.01)
-@assert isapprox(mean(chain, :α₀), α₀; atol=0.2)
-@assert isapprox(mean(chain, :β₀), β₀; atol=0.1)
+@assert isapprox(mean(chain, "x₀[1]"), x₀[1]; atol=0.5)
+@assert isapprox(mean(chain, "x₀[2]"), x₀[2]; atol=0.5)
 
-posterior_plt = plot(t, Array(posterior_samples)', color=1, alpha=0.1, label=nothing, title="Posterior predictive check")
-scatter!(posterior_plt, t, y, label="Data", color=2)
+posterior_plt = plot(tt, Array(posterior_samples)', color=1, alpha=0.1, label=nothing, title="Posterior predictive check")
+scatter!(posterior_plt, tt, y, label="Data", color=2)
 
 steps = 10
-y_forecast = Array(predict(local_linear(N, eltype(y), steps), chain));
+y_forecast = Array(predict(local_linear(T; forecast=steps), chain));
 forecast_plt = plot(1:length(y)+steps, y_forecast', color=1, alpha=0.1, label=nothing, title="Posterior forecast")
-scatter!(forecast_plt, t, y, label="Data", color=2)
+scatter!(forecast_plt, tt, y, label="Data", color=2)
