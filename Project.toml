@@ -1,0 +1,20 @@
+name = "TuringSTS"
+uuid = "0ee31dd8-9785-45df-b15d-2bfe9a78ff75"
+authors = ["Sebastian Callh"]
+version = "0.0.1"
+
+[deps]
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+Memoization = "6fafb56a-5788-4b4e-91ca-c0cea6611c73"
+ReverseDiff = "37e2e3b7-166d-5795-8a7a-e32c996b4267"
+StatsPlots = "f3b207a7-027a-5e70-b257-86293d7955fd"
+Turing = "fce5fe82-541a-59a6-adf8-730c64b5f9a0"
+
+[compat]
+julia = "1.7"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
