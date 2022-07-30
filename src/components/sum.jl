@@ -8,6 +8,8 @@ struct Sum <: Component
     obs_noise_scale::Float64
 end
 
+latent_size(m::Sum) = mapreduce(latent_size, +, m.components)
+observed_size(m::Sum) = mapreduce(observed_size, +, m.components)
 function (m::Sum)(x::AbstractArray{T}, t::Integer) where T <: Real
     results = [c(x, t) for c in m.components]    
     obs = mapreduce(c -> c[1], hcat, results)

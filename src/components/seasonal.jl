@@ -15,6 +15,9 @@ Seasonal(num_seasons::Integer, season_length::Integer, drift_scale::Real) = begi
     trans = diagm(ones(num_seasons))[:,vcat(num_seasons, 1:num_seasons-1)]
     Seasonal(obs, trans, season_length, drift_scale)
 end
+latent_size(m::Seasonal) = size(m.obs, 2)
+observed_size(m::Seasonal) = size(m.obs, 1)
+
 
 function (m::Seasonal)(x::AbstractArray{T}, t::Integer) where T <: Real
    num_seasons = size(m.trans, 1)
