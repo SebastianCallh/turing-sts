@@ -3,3 +3,4 @@ using Test
 
 include("components/local_linear.jl")
 include("components/seasonal.jl")
+include("components/sum.jl")
