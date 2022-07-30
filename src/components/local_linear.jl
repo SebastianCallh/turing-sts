@@ -6,7 +6,7 @@ end
 
 """
 
-    LocalLinear(level_scale, slope_scale)
+    LocalLinear(level_scale::Real, slope_scale::Real)
 
 """
 LocalLinear(level_scale=1., slope_scale=1.) = LocalLinear([1 0], [1 1; 0 1], [level_scale, slope_scale])
