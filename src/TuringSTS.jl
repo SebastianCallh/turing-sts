@@ -1,5 +1,5 @@
 module TuringSTS
-using LinearAlgebra
+using LinearAlgebra, Distributions
 
 export Seasonal, LocalLinear, Component, simulate
 export latent_size, observed_size
