@@ -16,3 +16,7 @@ function blockdiagonal(mats::Vector{Matrix{T}}) where T
     end
     res
 end
+
+function blockdiagonal(mats::Vector{Diagonal{T, Vector{T}}}) where T
+    Diagonal(mapreduce(diag, vcat, mats))
+end
