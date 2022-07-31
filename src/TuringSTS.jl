@@ -1,7 +1,7 @@
 module TuringSTS
 using LinearAlgebra
 
-export Seasonal, LocalLinear
+export Seasonal, LocalLinear, Component, simulate
 export latent_size, observed_size
 
 include("components/utils.jl")
