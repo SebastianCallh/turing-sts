@@ -74,22 +74,26 @@ end
 
 function predictive(model, chain)
     gq = Turing.generated_quantities(model, Turing.MCMCChains.get_sections(chain, :parameters))
-    mapreduce(gq -> only.(gq.y), hcat, gq)
+    μ = mapreduce(gq -> only.(gq.y), hcat, gq)    
+    Σ = mapreduce(gq -> gq.Σy, hcat, gq)
+    μ, Σ
 end
 
 level_scale, slope_scale = 0.5, 0.5
 sts = LocalLinear(level_scale, slope_scale) + Seasonal(num_seasons, season_length, season_drift_scale)
 prior_model = kalman(sts, similar(y, Missing))
 prior_chain = sample(prior_model, Prior(), 100)
-prior_y = predictive(prior_model, prior_chain)
-prior_plt = plot(tt, prior_y, label=nothing, color=1, title="Prior predictive")
+prior_μ, prior_Σ = predictive(prior_model, prior_chain)
+
+prior_plt = plot(tt, prior_μ, label=nothing, color=1, title="Prior predictive")
 scatter!(prior_plt, tt, y', color=seasons, label="Data")
 
 ##
 model = kalman(sts, y)
 chain = sample(model, NUTS(), 1000)
-post_gq = Turing.generated_quantities(model, Turing.MCMCChains.get_sections(chain, :parameters))
-post_y = predictive(model, chain)
+post_μ, post_Σ = predictive(model, chain)
+mean(group(chain, :x₀))
+x₀
 @assert isapprox(mean(chain, "x₀[1]"), x₀[1]; atol=0.2)
 @assert isapprox(mean(chain, "x₀[2]"), x₀[2]; atol=0.2)
 @assert isapprox(mean(chain, "x₀[3]"), x₀[3]; atol=0.2)
@@ -98,13 +102,16 @@ post_y = predictive(model, chain)
 @assert isapprox(mean(chain, "x₀[6]"), x₀[6]; atol=0.2)
 @assert isapprox(mean(chain, :σ), σ; atol=0.1)
 
+mean_conf(Σ) = 2 .* mean(sqrt.(only.(diag.(Σ))); dims=2)
+
 ## 
-posterior_plt = plot(tt, post_y, color=1, alpha=0.1, label=nothing, title="Posterior predictive check")
-scatter!(posterior_plt, tt, y', label="Data", color=seasons)
+mean(sqrt.(only.(diag.(post_Σ))))
+posterior_plt = plot(tt, mean(post_μ; dims=2), ribbon=mean_conf(post_Σ), label=nothing, title="Posterior predictive check")
+scatter!(posterior_plt, tt, y', label="Data", color=seasons, legend=:topleft)
 
 ## 
 steps = 50
-forecast_y = predictive(kalman(sts, y; forecast=steps), chain)
-forecast_plt = plot(1:length(y)+steps, forecast_y, color=1, alpha=0.1, label=nothing, title="Posterior forecast")
-scatter!(forecast_plt, tt, y', label="Data", color=seasons)
-scatter!(forecast_plt, tt[end]+1:tt[end]+num_test, y_test', label=nothing, color="gray")
+forecast_μ, forecast_Σ = predictive(kalman(sts, y; forecast=steps), chain)
+forecast_plt = plot(1:length(y)+steps, mean(forecast_μ; dims=2), ribbon=mean_conf(forecast_Σ), label=nothing, title="Posterior forecast")
+scatter!(forecast_plt, tt, y', label="Train data", color=seasons, legend=:topleft)
+scatter!(forecast_plt, tt[end]+1:tt[end]+num_test, y_test', label="Test data", color="gray")
