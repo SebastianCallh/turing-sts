@@ -1,24 +1,30 @@
-using StatsPlots, Turing, Distributions, LinearAlgebra, Statistics, Random
+using StatsPlots
+using Turing
+using Distributions
+using LinearAlgebra
+using Statistics
+using Random
+
 using TuringSTS
 
 ##
 Random.seed!(12345)
 
-loc_lin_init = [-0.8, 0.4]
-season_effects = [0.1, 0.2, 0, -0.2]
+loc_lin_init = [-0.8, 0.2]
+season_effects = [0.4, 0.6, 0.3, 0, -0.2, -0.5, -0.3]
 x₀ = vcat(loc_lin_init, season_effects)
 num_seasons = length(season_effects)
-season_length = 3
-num_occurences = 2
+season_length = 1
+num_occurences = 4
 seasons = repeat(collect(1:num_seasons), inner=season_length, outer=num_occurences)
 T = length(seasons)
 σ = 0.1
 tt = collect(1:T)
 num_test = 20
 
-level_drift_scale = 0.1
-slope_drift_scale = 0.1
-season_drift_scale = 0.1
+level_drift_scale = 0.2
+slope_drift_scale = 0.2
+season_drift_scale = 0.2
 sts = LocalLinear(level_drift_scale, slope_drift_scale) + Seasonal(num_seasons, season_length, season_drift_scale)
 y = simulate(sts, T + num_test, x₀, σ)
 y_test = y[:,T+1:end]
@@ -26,7 +32,25 @@ y = y[:,1:T]
 scatter(tt, y', color=seasons, label=nothing, title="Data")
 
 ##
-@model function kalman(sts, y; forecast=0)
+
+function kalman_predict(x, P, H, F, Q, R)
+    x = F*x
+    P = F*P*F' + Q
+    y = H*x
+    S = H*P*H' + R
+    x, P, y, S
+end
+
+function kalman_update(x, P, r, S, H, R)
+    K = P*H'/S
+    x = x + K*r
+    P = (I - K*H)*P
+    S = H*P*H' + R
+    y = H*x
+    x, P, y, S
+end
+
+@model function kalman(sts, ys; forecast=0)
     obs_dim, T = size(y)
     latent_dim = latent_size(sts)
  
@@ -41,34 +65,22 @@ scatter(tt, y', color=seasons, label=nothing, title="Data")
  
     res = map(1:T′) do t
         H, F, Q = sts(t)
-
-        x = F*x
-        P = F*P*F' + Q
-        ŷ = H*x
-        S = H*P*H' + R
-
-        if t <= T && !ismissing(y[t])
-            v = y[:,t] - ŷ
-            K = P*H'*inv(S)
-            x = x + K*v            
-            P = (I - K*H)*P
-
-            # corrected observation
-            S = H*P*H' + R
-            ŷ = H*x
-
-            C = cholesky(S)
-            loglik = - only(0.5 * logdet(S) + v'*(C \ v))
+        x, P, y, S = kalman_predict(x, P, H, F, Q, R)
+        
+        if t <= T && !ismissing(ys[t])
+            r = ys[:,t] - y
+            x, P, y, S = kalman_update(x, P, r, S, H, R)            
+            loglik = - only(0.5 * logdet(S) + r'/S*r)
             Turing.@addlogprob! loglik
         end
-        ŷ, S, x, P
+        x, P, y, S
     end
  
     return (
-        y=[r[1] for r in res],
-        Σy=[r[2] for r in res],
-        x=[r[3] for r in res],
-        Σx=[r[4] for r in res],
+        x=[r[1] for r in res],
+        Σx=[r[2] for r in res],    
+        y=[r[3] for r in res],
+        Σy=[r[4] for r in res]
     )
 end
 
@@ -102,16 +114,15 @@ x₀
 @assert isapprox(mean(chain, "x₀[6]"), x₀[6]; atol=0.2)
 @assert isapprox(mean(chain, :σ), σ; atol=0.1)
 
+## 
 mean_conf(Σ) = 2 .* mean(sqrt.(only.(diag.(Σ))); dims=2)
 
-## 
-mean(sqrt.(only.(diag.(post_Σ))))
 posterior_plt = plot(tt, mean(post_μ; dims=2), ribbon=mean_conf(post_Σ), label=nothing, title="Posterior predictive check")
-scatter!(posterior_plt, tt, y', label="Data", color=seasons, legend=:topleft)
+scatter!(posterior_plt, tt, y', label="Data", color=seasons)
 
 ## 
-steps = 50
+steps = num_test
 forecast_μ, forecast_Σ = predictive(kalman(sts, y; forecast=steps), chain)
 forecast_plt = plot(1:length(y)+steps, mean(forecast_μ; dims=2), ribbon=mean_conf(forecast_Σ), label=nothing, title="Posterior forecast")
-scatter!(forecast_plt, tt, y', label="Train data", color=seasons, legend=:topleft)
+scatter!(forecast_plt, tt, y', label="Train data", color=seasons)
 scatter!(forecast_plt, tt[end]+1:tt[end]+num_test, y_test', label="Test data", color="gray")
