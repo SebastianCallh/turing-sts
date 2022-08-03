@@ -1074,6 +1074,14 @@ version = "2.0.2"
 [[deps.SHA]]
 uuid = "ea8e919c-243c-51af-8825-aaa63cd721ce"
 
+[[deps.STSlib]]
+deps = ["GaussianDistributions", "LinearAlgebra"]
+git-tree-sha1 = "8de09b5368601e618f0471aaf73baa211797a6d8"
+repo-rev = "master"
+repo-url = "https://github.com/SebastianCallh/STSlib.jl"
+uuid = "a48b2831-cff4-4711-af15-66f5efafcdc7"
+version = "0.1.0"
+
 [[deps.SciMLBase]]
 deps = ["ArrayInterfaceCore", "CommonSolve", "ConstructionBase", "Distributed", "DocStringExtensions", "IteratorInterfaceExtensions", "LinearAlgebra", "Logging", "Markdown", "RecipesBase", "RecursiveArrayTools", "StaticArraysCore", "Statistics", "Tables"]
 git-tree-sha1 = "7cb46ff55af945a8b68e148bf22f9325f7221d8d"
