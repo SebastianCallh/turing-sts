@@ -10,8 +10,8 @@ using STSlib, TuringSTS
 ##
 Random.seed!(12345)
 
-loc_lin_init = [-0.8, 0.2]
-season_effects = [7.5, 5, -2, -5]
+loc_lin_init = [-0.8, 0.01]
+season_effects = [1.5, 4, -2, -3]
 x₀ = vcat(loc_lin_init, season_effects)
 num_seasons = length(season_effects)
 season_length = 5
@@ -23,8 +23,8 @@ season_colors = isempty(seasons) ? 1 : seasons
 tt = collect(1:T)
 num_test = 10
 
-level_drift_scale = 2
-slope_drift_scale = 0.2
+level_drift_scale = 0.2
+slope_drift_scale = 0.01
 season_drift_scale = 0.2
 sts = LocalLinear(level_drift_scale, slope_drift_scale) + Seasonal(num_seasons, season_length, season_drift_scale)
 x, y = simulate(sts, T + num_test, x₀, σ)
