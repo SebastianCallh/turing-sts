@@ -5,7 +5,7 @@ using LinearAlgebra
 using Statistics
 using Random
 
-using TuringSTS
+using STSlib, TuringSTS
 
 ##
 Random.seed!(12345)
