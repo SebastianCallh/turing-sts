@@ -9,7 +9,7 @@ end
 function kalman_update(x, P, r, S, H, R)
     K = P*H'/S
     x = x + K*r
-    P = (I - K*H)*P
+    P = (I - K*H)*P*(I - K*H)' + K*R*K'
     S = H*P*H' + R
     y = H*x
     x, P, y, S
